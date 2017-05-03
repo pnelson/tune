@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>tune</title>
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/semantic-ui/2.2.6/semantic.min.css">
+    <style>
+      #app {
+        margin-top: 1em;
+      }
+      .ui.header>.icon.stop {
+        font-size: 0.78571429rem;
+        line-height: 1.2em;
+      }
+      .ui.header .icon:only-child.stop {
+        margin-right: 0;
+      }
+      .ui.compact.icon.button.stop {
+        padding: 0.4em;
+        margin-right: 0.25em;
+      }
+    </style>
+    <script src="/vue.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div class="ui container">
+        <h2 class="ui header">
+          <div v-if="playing" class="content">
+            {{playing.channel}} <div class="ui tiny basic teal label">{{playing.station}}</div>
+            <div class="ui sub header">
+              <button class="ui red mini compact icon button stop" @click="stop">
+                <i class="stop icon"></i>
+              </button>
+              {{playing.track}}
+            </div>
+          </div>
+          <div v-else="playing" class="content">
+            Not Playing
+            <div class="ui sub header">Select a channel to begin playback</div>
+          </div>
+        </h2>
+        <div class="ui doubling stackable grid">
+          <div class="six wide column">
+            <div class="ui massive fluid vertical menu">
+              <a class="item" :class="{ 'active teal': s === tab }" v-for="s in stations" @click="setTab(s)">
+                {{s}}
+                <div class="ui label" :class="{ 'teal left pointing': s === tab }">{{channelCount(s)}}</div>
+              </a>
+            </div>
+          </div>
+          <div class="ten wide column">
+            <div class="ui search">
+              <div class="ui fluid huge icon input">
+                <input v-model="search" placeholder="Channel Search">
+                <i class="search icon"></i>
+              </div>
+            </div>
+            <div class="ui big very relaxed middle aligned selection list">
+              <div class="item" v-for="c in filteredChannels" @click="play(tab, c.id)">
+                <div class="content teal">
+                  {{c.name}}
+                  <div class="right floated content">
+                    <i v-if="loading === c.id" class="grey play icon"></i>
+                    <i v-if="loading === 0 && playing !== null && c.name === playing.channel" class="teal play icon"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+    var app = new Vue({
+      el: '#app',
+      data: function() {
+        return {
+          tab: 'di.fm',
+          search: '',
+          loading: 0,
+          playing: null,
+          stations: ['di.fm', 'radiotunes.com', 'jazzradio.com', 'rockradio.com', 'classicalradio.com'],
+          channels: null
+        };
+      },
+      computed: {
+        filteredChannels: function() {
+          var search = this.search.toLowerCase();
+          if (this.channels === null) {
+            return null;
+          }
+          return this.channels[this.tab].filter(function(channel) {
+            return channel.name.toLowerCase().indexOf(search) >= 0;
+          });
+        }
+      },
+      methods: {
+        channelCount: function(station) {
+          if (this.channels === null) {
+            return 0;
+          }
+          return this.channels[station].length;
+        },
+        setTab: function(station) {
+          this.tab = station;
+          this.search = '';
+        },
+        play: function(station, id) {
+          var vm = this;
+          var options = { method: 'POST' };
+          fetch('play/'+station+'/'+id, options).then(function(response) {
+            vm.loading = id;
+          });
+        },
+        stop: function() {
+          fetch('stop', { method: 'POST' });
+        }
+      },
+      beforeCreate: function() {
+        var vm = this;
+        var source = new EventSource('/events');
+        source.onmessage = function(e) {
+          var data = JSON.parse(e.data);
+          if (Object.keys(data).length === 0) {
+            vm.playing = null;
+          } else {
+            vm.playing = data;
+          }
+          vm.loading = 0;
+        };
+        source.onerror = function() {
+          vm.loading = 0;
+          vm.playing = null;
+        };
+        fetch('channels.json').then(function(response) {
+          return response.json();
+        }).then(function(data) {
+          vm.channels = data;
+        });
+      }
+    });
+    </script>
+  </body>
+</html>
