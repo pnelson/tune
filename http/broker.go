@@ -41,20 +41,18 @@ func (b *broker) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		abort(w, http.StatusInternalServerError)
 		return
 	}
-	go func() {
-		<-n.CloseNotify()
-		b.del <- queue
-	}()
+	done := n.CloseNotify()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	for {
-		data, ok := <-queue
-		if !ok {
-			break
+		select {
+		case data := <-queue:
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			f.Flush()
+		case <-done:
+			b.del <- queue
 		}
-		fmt.Fprintf(w, "data: %s\n\n", data)
-		f.Flush()
 	}
 }
 
