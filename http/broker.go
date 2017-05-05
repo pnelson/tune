@@ -52,6 +52,7 @@ func (b *broker) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			f.Flush()
 		case <-done:
 			b.del <- queue
+			return
 		}
 	}
 }
